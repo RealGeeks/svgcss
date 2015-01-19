@@ -4,11 +4,15 @@ var path = require('path');
 var join = path.join;
 var basename = path.basename;
 var extname = path.extname;
+var dirname = path.dirname;
 var fs = require('fs');
 var read = fs.readFileSync;
-var write = fs.writeFileSync;
+var writeFile = fs.writeFile;
+var mkdirp = require('mkdirp');
 var glob = require('glob');
-var map = require('async').map;
+var async = require('async');
+var parallel = async.parallel;
+var map = async.map;
 var _ = require('lodash');
 var template = _.template;
 var pluck = _.pluck;
@@ -19,6 +23,22 @@ var renderBase64Png = require('./lib/render-base64');
 
 var baseName = function (path) {
   return basename(path, extname(path));
+};
+
+var addSuffix = function (path, suffix) {
+  var ext = extname(path);
+
+  return path.slice(0, -ext.length) + '-' + suffix + ext;
+};
+
+var write = function (path, contents, callback) {
+  mkdirp(dirname(path), function (err) {
+    if (err) {
+      callback(err);
+    }
+
+    writeFile(path, contents, callback);
+  });
 };
 
 var blowUp = function (err) {
@@ -44,9 +64,14 @@ module.exports = function (options, done) {
 
   var namespace = options.namespace;
   var destination = options.destination;
+  var fallback = options.fallback;
 
   if (destination) {
     destination = join(process.cwd(), destination);
+
+    if (fallback && typeof fallback != 'string') {
+      fallback = addSuffix(destination, 'fallback');
+    }
   }
 
   glob(options.source, function (err, files) {
@@ -76,7 +101,7 @@ module.exports = function (options, done) {
 
             image.css = options.process(image);
 
-            if (options.fallback) {
+            if (fallback) {
               renderBase64Png(svgUri, width, height, function (err, base64Png) {
                 if (err) {
                   callback(err);
@@ -102,17 +127,33 @@ module.exports = function (options, done) {
         }
 
         if (destination) {
-          write(join(destination, namespace + '.css'), pluck(images, 'css').join('\n'));
+          parallel([
+            function (callback) {
+              write(destination, pluck(images, 'css').join('\n'), callback);
+            },
+            function (callback) {
+              if (fallback) {
+                write(
+                  fallback,
+                  pluck(images, 'fallbackCss').join('\n'),
+                  callback
+                );
+              } else {
+                callback(null);
+              }
+            }
+          ], function (err) {
+            if (err) {
+              done(err);
+              return;
+            }
 
-          if (options.fallback) {
-            write(
-              join(destination, namespace + '-fallback.css'),
-              pluck(images, 'fallbackCss').join('\n')
-            );
-          }
+            done(null, images);
+          });
+
+        } else {
+          done(null, images);
         }
-
-        done(null, images);
       }
     );
   });

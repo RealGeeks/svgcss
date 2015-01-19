@@ -2,9 +2,7 @@
 
 var fs = require('fs');
 var test = require('tape');
-var async = require('async');
 var del = require('del');
-var mkdirp = require('mkdirp');
 var svgcss = require('./');
 
 var output = '.tmp/test-output/';
@@ -55,37 +53,33 @@ test('Basic usage', function (assert) {
 test('Advanced usage', function (assert) {
   assert.plan(8);
 
-  async.waterfall([
-    // start clean each time
-    del.bind(undefined, output),
-    mkdirp.bind(undefined, output)
-  ],
-    function () {
-      svgcss({
-        source: 'fixtures/images/template-image.svg',
-        destination: output,
-        namespace: 'test',
-        fallback: true,
-        data: {width: 13},
-        process: function (image) {
-          return image.name + image.width;
-        }
-      }, function (err, res) {
-        assert.equal(err, null, 'no error');
-        assert.equal(res.length, 1, 'result length');
-        assert.equal(res[0].namespace, 'test', 'namespace');
-        assert.equal(res[0].width, 13, 'custom width');
-        assert.equal(res[0].css, 'template-image13', 'image name');
-        assert.equal(res[0].fallbackCss, 'template-image13', 'image name');
-
-        fs.exists(output + 'test.css', function (exists) {
-          assert.ok(exists, 'css file exists');
-        });
-
-        fs.exists(output + 'test-fallback.css', function (exists) {
-          assert.ok(exists, 'fallback css file exists');
-        });
-
+  // start clean each time
+  del(output, function () {
+    svgcss({
+      source: 'fixtures/images/template-image.svg',
+      destination: output + 'name.ext',
+      namespace: 'test',
+      fallback: true,
+      data: {width: 13},
+      process: function (image) {
+        return image.name + image.width;
+      }
+    }, function (err, res) {
+      assert.equal(err, null, 'no error');
+      assert.equal(res.length, 1, 'result length');
+      assert.equal(res[0].namespace, 'test', 'namespace');
+      assert.equal(res[0].width, 13, 'custom width');
+      assert.equal(res[0].css, 'template-image13', 'image name');
+      assert.equal(res[0].fallbackCss, 'template-image13', 'image name');
+      console.log('<>', output + 'name.ext');
+      fs.exists(output + 'name.ext', function (exists) {
+        assert.ok(exists, 'css file exists');
       });
+
+      fs.exists(output + 'name-fallback.ext', function (exists) {
+        assert.ok(exists, 'fallback css file exists');
+      });
+
     });
+  });
 });
