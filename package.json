@@ -1,6 +1,6 @@
 {
   "name": "svgcss",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Embed SVG files in CSS as data URIs with PNG fallback.",
   "files": [
     "index.js",
